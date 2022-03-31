@@ -1,0 +1,223 @@
+---
+title: "#30 Day Chart Challenge 2022 Day 01"
+author: "Christian Gebhard"
+date: "22 3 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the code for Day 1 of #30DaysOfCode
+
+## Loading Libraries and Reading Data
+
+```{r}
+library(tidyverse)
+library(ggtext)
+library(MetBrewer)
+library(patchwork)
+# library(emojifont)  
+library(ggwaffle)
+library(ggsvg)
+library("fontawesome")
+
+
+shakespeare <- read_csv("../data/shakespeare/shakespeare_complete.csv")
+```
+
+## Data wrangling
+
+```{r}
+# integrate play categories according to wikipedia
+play_category <- tribble(
+  ~Play, ~category,
+  "Hamlet", "Tragedy",
+  "Coriolanus", "Tragedy",
+  "Cymbeline", "Tragedy",
+  "Richard III", "History",
+  "Antony and Cleopatra", "Tragedy",
+  "Othello", "Tragedy",
+  "King Lear", "Tragedy",
+  "Troilus and Cressida", "Tragedy",
+  "A Winters Tale", "Comedy",
+  "Henry VIII", "History",
+  "Henry IV, Part 2", "History",
+  "Henry V", "History",
+  "Henry VI Part 2", "History",
+  "Romeo and Juliet", "Tragedy",
+  "Henry IV", "History",
+  "Henry VI Part 3", "History",
+  "Alls well that ends well", "Comedy",
+  "Loves Labours Lost", "Comedy",
+  "Measure for measure", "Comedy",
+  "Richard II", "History",
+  "Henry VI Part 1", "History",
+  "As you like it", "Comedy",
+  "Merchant of Venice", "Comedy",
+  "King John", "History",
+  "Taming of the Shrew", "Comedy",
+  "Merry Wives of Windsor", "Comedy",
+  "Julius Caesar", "Tragedy",
+  "Much Ado about nothing", "Comedy",
+  "Titus Andronicus", "Tragedy",
+  "Timon of Athens", "Tragedy",
+  "Twelfth Night", "Comedy",
+  "Pericles", "Comedy",
+  "Macbeth", "Tragedy",
+  "The Tempest", "Comedy",
+  "Two Gentlemen of Verona", "Comedy",
+  "A Midsummer nights dream", "Comedy",
+  "A Comedy of Errors", "Comedy"
+)
+
+# The data on Henry IV, Part 2 does not contain stage directions. It is therefore excluded
+stage_directions <- shakespeare |> 
+  filter(Play != "Henry IV, Part 2") |> 
+  mutate(
+    stage_direction = ifelse(is.na(spoken_line), TRUE, FALSE)
+  ) |> 
+  left_join(play_category, by = "Play")
+
+
+tallied_directions <- stage_directions |> 
+  group_by(stage_direction, Play, category) |> 
+  tally() |> 
+  ungroup() |> 
+  arrange(Play) |> 
+  group_by(category, stage_direction) |> 
+  summarise(tallied = round(sum(n)/500)) |> 
+  ungroup()
+
+untallied <- tallied_directions |> 
+  uncount(tallied)
+
+untallied |> 
+  count(category, stage_direction)
+
+
+comedies <- untallied |> 
+  filter(category == "Comedy") 
+
+histories <- untallied |> 
+  filter(category == "History")
+
+tragedies <- untallied |> 
+  filter(category == "Tragedy")
+
+```
+
+
+## Waffle Plot
+
+```{r}
+
+icon_size <- 4
+
+waffle_comedies <- waffle_iron(comedies, aes_d(group = stage_direction), sample_size = 1, rows = 5) |> 
+  mutate(
+    flabel = ifelse(
+      group,
+      fa("feather-alt", fill = '#c399a2'),
+      fa("smile", fill = "#e3cacf")
+    )
+  )
+
+p_comedies <- ggplot(waffle_comedies, aes(x, y)) + 
+  geom_point_svg(
+    aes(svg=flabel), 
+    size = icon_size
+    ) +
+  coord_equal() +
+  scale_y_continuous(limits = c(0, 6))+
+  scale_x_continuous(limits = c(0, 20)) +
+  # labs(
+  #   title = "<span style = 'font-size:32pt; font-family:Niconne;'>Comedies</span>"
+  # ) +
+  theme_void() +
+  theme(
+    text = element_text(family = "Noto Sans"),
+    # plot.title.position = "plot",
+    plot.title = element_markdown(lineheight = 1.2),
+    plot.subtitle = element_markdown(lineheight = 0.8),
+    plot.caption = element_markdown(lineheight = 0.8, size = 14)
+  )
+
+waffle_histories <- waffle_iron(histories, aes_d(group = stage_direction), sample_size = 1, rows = 5) |> 
+  mutate(
+    flabel = ifelse(
+      group,
+      fa("feather-alt", fill = "#4e6d58"),
+      fa("chess-king", fill = "#749e89")
+    )
+  )
+
+p_histories <- ggplot(waffle_histories, aes(x, y)) + 
+  geom_point_svg(aes(svg=flabel), size = icon_size) +
+  coord_equal() +
+  scale_y_continuous(limits = c(0, 6))+
+  scale_x_continuous(limits = c(0, 20)) +
+  theme_void() +
+  theme(
+    text = element_text(family = "Noto Sans"),
+    plot.title.position = "panel",
+    plot.title = element_markdown(lineheight = 1.2),
+    plot.subtitle = element_markdown(lineheight = 0.8),
+    plot.caption = element_markdown(lineheight = 0.8, size = 14)
+  )
+
+waffle_tragedies <- waffle_iron(tragedies, aes_d(group = stage_direction), sample_size = 1, rows = 5) |> 
+  mutate(
+    flabel = ifelse(
+      group,
+      fa("feather-alt", fill = "#41507b"),
+      fa("sad-tear", fill = "#7d87b2")
+    )
+  )
+
+p_tragedies <- ggplot(waffle_tragedies, aes(x, y)) + 
+  geom_point_svg(aes(svg=flabel), size = icon_size) +
+  coord_equal() +
+  scale_y_continuous(limits = c(0, 6))+
+  scale_x_continuous(limits = c(0, 20)) +
+  theme_void() +
+  theme(
+    text = element_text(family = "Noto Sans"),
+    # plot.title.position = "plot",
+    plot.title = element_markdown(lineheight = 1.2),
+    plot.subtitle = element_markdown(lineheight = 0.8),
+    plot.caption = element_markdown(lineheight = 0.8, size = 14)
+  )
+
+```
+
+```{r}
+library("showtext")
+font_add_google("Noto Sans Mono")
+font_add_google("Noto Sans")
+font_add_google("Niconne")
+font_add('fa-solid', '../fonts/Font Awesome 6 Free-Solid-900.otf')
+showtext_auto()
+```
+
+
+```{r}
+
+patched <- p_comedies + p_histories + p_tragedies + 
+  plot_layout(ncol = 1) +
+  plot_annotation(
+    title = "<span style = 'font-size:60pt; font-family:Niconne;'>Thunder and lightning. Enter three Witches</span>",
+    subtitle = "<span style = 'font-size:24pt; font-family:Noto Sans;'>The monumental works of William Shakespeare comprise <span style = 'color: #e3cacf;'><b>comic</b></span>, <span style = 'color: #749e89;'><b>historic</b></span> and<br><span style = 'color: #7d87b2;'><b>tragic</b></span> plays. The <b>stage directions <span style='font-family:fa-solid; color: #000000'>&#xf56b;</span></b> account for ~5.6% of total text lines,<br>which is only a small part of the whole opus when compared to the lines spoken by<br> actors. Each icon below represents 500 lines of text (rounded), counted across<br> all plays in each category.",
+    caption = "<span style = 'font-size:16pt; font-family:Noto Sans;'>DataViz by @c_gebhard | <b>#30DayChartChallenge 2022, Day 01</b> | Data by Kaggle user LiamLarsen</span>",
+    theme = theme(
+      plot.title = element_markdown(lineheight = 1.2),
+      plot.subtitle = element_markdown(lineheight = 0.8),
+      plot.caption = element_markdown(lineheight = 0.8)
+    )
+  ) 
+
+
+ggsave(here::here("..", "plots", "2022_01.png"), plot = patched, height = 5.5, width = 4, dpi = "retina")
+```
+
