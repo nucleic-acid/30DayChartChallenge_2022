@@ -18,19 +18,23 @@ library(tidyverse)
 library(ggtext)
 library(MetBrewer)
 library(patchwork)
-# library(emojifont)  
 library(ggwaffle)
 library(ggsvg)
 library("fontawesome")
 
 
-shakespeare <- read_csv("../data/shakespeare/shakespeare_complete.csv")
+
 ```
 
 ## Data wrangling
 
 ```{r}
-# integrate play categories according to wikipedia
+## Original data was obtained on 2022-03-22.
+# data downloaded from kaggle by user LiamLarsen (Version 4) and cleaned before usage.
+
+shakespeare <- read_csv("../data/shakespeare/shakespeare_complete.csv")
+
+# define play categories according to wikipedia
 play_category <- tribble(
   ~Play, ~category,
   "Hamlet", "Tragedy",
@@ -132,13 +136,10 @@ p_comedies <- ggplot(waffle_comedies, aes(x, y)) +
   coord_equal() +
   scale_y_continuous(limits = c(0, 6))+
   scale_x_continuous(limits = c(0, 20)) +
-  # labs(
-  #   title = "<span style = 'font-size:32pt; font-family:Niconne;'>Comedies</span>"
-  # ) +
+
   theme_void() +
   theme(
     text = element_text(family = "Noto Sans"),
-    # plot.title.position = "plot",
     plot.title = element_markdown(lineheight = 1.2),
     plot.subtitle = element_markdown(lineheight = 0.8),
     plot.caption = element_markdown(lineheight = 0.8, size = 14)
