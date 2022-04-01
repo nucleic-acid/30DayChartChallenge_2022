@@ -193,6 +193,9 @@ p_tragedies <- ggplot(waffle_tragedies, aes(x, y)) +
 
 ```
 
+
+# load fonts
+
 ```{r}
 library("showtext")
 font_add_google("Noto Sans Mono")
@@ -202,7 +205,7 @@ font_add('fa-solid', '../fonts/Font Awesome 6 Free-Solid-900.otf')
 showtext_auto()
 ```
 
-
+# compose plot with {patchwork}
 ```{r}
 
 patched <- p_comedies + p_histories + p_tragedies + 
