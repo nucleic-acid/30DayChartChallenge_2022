@@ -1,0 +1,263 @@
+---
+title: "#30daysofcode_2022_03"
+author: "Christian Gebhard"
+date: "22 3 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the code for Day 3 of #30DaysOfCode 2022
+
+## Loading Libraries and Reading Data
+
+```{r}
+library(tidyverse)
+library(ggtext)
+library(MetBrewer)
+library(patchwork)
+
+
+shakespeare <- read_csv("../data/shakespeare/shakespeare_tidy.csv")
+```
+
+## Text-Graph
+
+```{r}
+# count lines of spoken dialogue in each play
+line_counts <- shakespeare |> 
+  group_by(Play) |> 
+  tally(sort = TRUE)
+
+# define a reference string 
+ref_string <- "Two households, both alike in dignity, In fair Verona, where we lay our scene"
+
+# scale all line counts relative to Romeo and Juliet
+# and calculate a number of characters relative to the reference string
+romeojuliet <- line_counts |> 
+  filter(Play == "Romeo and Juliet") |> 
+  pull(n)
+
+line_counts <- line_counts |> 
+  mutate(
+    scaled_length = n / romeojuliet,
+    n_letters = round(scaled_length * nchar(ref_string), digits = 0)
+  )
+```
+
+```{r}
+# obtain the number of the first act and scene of a play
+min_act <- shakespeare |>
+  group_by(Play) |>
+  summarise(
+    min_act = min(Act),
+    min_scene = min(Scene))
+
+label_text <- shakespeare |> 
+  inner_join(min_act, by = c("Act" = "min_act", "Play" = "Play", "Scene" = "min_scene")) |> 
+  group_by(Play) |> 
+  filter(spoken_line < 10) |> 
+  summarise(label_text = paste(PlayerLine, collapse = " "))
+
+# integrate play categories according to wikipedia
+play_category <- tribble(
+  ~Play, ~category,
+  "Hamlet", "Tragedy",
+  "Coriolanus", "Tragedy",
+  "Cymbeline", "Tragedy",
+  "Richard III", "History",
+  "Antony and Cleopatra", "Tragedy",
+  "Othello", "Tragedy",
+  "King Lear", "Tragedy",
+  "Troilus and Cressida", "Tragedy",
+  "A Winters Tale", "Comedy",
+  "Henry VIII", "History",
+  "Henry IV, Part 2", "History",
+  "Henry V", "History",
+  "Henry VI Part 2", "History",
+  "Romeo and Juliet", "Tragedy",
+  "Henry IV", "History",
+  "Henry VI Part 3", "History",
+  "Alls well that ends well", "Comedy",
+  "Loves Labours Lost", "Comedy",
+  "Measure for measure", "Comedy",
+  "Richard II", "History",
+  "Henry VI Part 1", "History",
+  "As you like it", "Comedy",
+  "Merchant of Venice", "Comedy",
+  "King John", "History",
+  "Taming of the Shrew", "Comedy",
+  "Merry Wives of Windsor", "Comedy",
+  "Julius Caesar", "Tragedy",
+  "Much Ado about nothing", "Comedy",
+  "Titus Andronicus", "Tragedy",
+  "Timon of Athens", "Tragedy",
+  "Twelfth Night", "Comedy",
+  "Pericles", "Comedy",
+  "Macbeth", "Tragedy",
+  "The Tempest", "Comedy",
+  "Two Gentlemen of Verona", "Comedy",
+  "A Midsummer nights dream", "Comedy",
+  "A Comedy of Errors", "Comedy"
+)
+
+shakespeare_labels <- shakespeare |> 
+  left_join(label_text, by = "Play") |> 
+  left_join(line_counts, by = "Play") |>
+  left_join(play_category, by = "Play") |> 
+  mutate(
+    labels_cut = str_to_upper(substr(label_text, 1, n_letters)),
+    fontface = ifelse(Play == "Romeo and Juliet", "bold", "plain")
+    ) |> 
+  distinct(Play, .keep_all = TRUE) |> 
+  select(Play, labels_cut, n, fontface, category) |> 
+  arrange(desc(n))
+
+
+
+
+```
+
+```{r}
+library("showtext")
+font_add_google("Noto Sans Mono")
+font_add_google("Noto Sans")
+font_add_google("Niconne")
+showtext_auto()
+```
+
+
+
+
+```{r}
+base_plot <- ggplot(shakespeare_labels) +
+  geom_richtext(
+    aes(
+      x = reorder(Play, n), 
+      y = 0, 
+      label = labels_cut,
+      fontface = fontface,
+      color = category),
+    hjust = 0,
+    fill = NA,
+    label.color = NA,
+    family = "Noto Sans Mono",
+    size = 4.5) +
+  scale_y_continuous(limits = c(0, 4100),expand = c(0,0)) +
+  labs(
+    y = "<span style = 'font-size:32pt; font-family:Niconne;'>Relative length of each play</span>",
+    title = "<span style = 'font-size:64pt; font-family:Niconne;'>Two plots, both alike in dignity</span>",
+    subtitle = "<span style = 'font-size:20pt; font-family: Noto Sans Mono;'>Shakespeare's comedies are shorter than his tragedies. The left shows the plays' lengths relative to <b>Romeo and Juliet</b> by cropping<br>the first spoken lines proportionally to the play's line count. On the right, the distribution of the plays' line counts are compared <br> within the three categories <span style = 'color: #845d29; font-weight: bold;'>Comedy</span>, <span style = 'color: #178f92; font-weight: bold;'>History</span> and <span style = 'color: #054544; font-weight: bold;'>Tragedy</span>.</span>",
+    caption = "<span style = 'font-size:14pt; font-family:Noto Sans;'>DataViz by @c_gebhard  | <b>#30DayChartChallenge 2022, Day 03</b> | Data by Kaggle users LiamLarsen and aodhan</span>"
+  ) +
+  theme_classic(base_family = "Noto Sans") +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.text.y = element_markdown(family = "Noto Sans", size = "10pt", face = "bold"),
+        axis.ticks.y = element_blank(),
+        axis.title.x = element_markdown(hjust = 0),
+        axis.title.y = element_blank()
+        )+
+  coord_flip() +
+  theme(
+    text = element_text(family = "Noto Sans"),
+    plot.title.position = "plot",
+    plot.title = element_markdown(lineheight = 1.2),
+    plot.subtitle = element_markdown(lineheight = 0.8),
+    plot.caption = element_markdown(lineheight = 0.8)
+  ) +
+  scale_color_met_d(name = "Isfahan1") +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_blank(),
+    plot.background = element_rect(fill = '#f2e2c9'),
+    panel.background = element_blank()
+  ) +
+  theme(legend.position = "none")
+
+base_plot
+```
+
+
+## Raincloud plot
+
+```{r}
+dist_plot <- ggplot(shakespeare_labels, aes(x = category, y = n, fill = category)) + 
+  ggdist::stat_halfeye(
+    adjust = .5, 
+    width = .6, 
+    .width = 0, 
+    justification = -.3, 
+    point_colour = NA,
+    alpha = 0.85) + 
+  geom_boxplot(
+    width = .25, 
+    outlier.shape = NA,
+    alpha = 0.5
+  ) +
+  geom_point(
+    aes(color = category),
+    size = 1,
+    alpha = .75,
+    position = position_jitter(
+      seed = 1, width = .1
+    )
+  ) + 
+  scale_x_discrete(
+    breaks = c("Comedy", "History", "Tragedy"),
+    labels = c("<span style = 'font-size:28pt; font-family:Niconne;'>Comedy</span>", 
+               "<span style = 'font-size:28pt; font-family:Niconne;'>History</span>", 
+               "<span style = 'font-size:28pt; font-family:Niconne;'>Tragedy</span>")
+  ) +
+  scale_fill_met_d(name = "Isfahan1") +
+  scale_color_met_d(name = "Isfahan1") +
+  scale_y_continuous(
+    breaks = c(2000, 2500, 3000, 3500, 4000),
+    labels = c(
+      "<span style = 'font-size:20pt; font-family:Niconne;'>2000</span>",
+      "<span style = 'font-size:20pt; font-family:Niconne;'>2500</span>",
+      "<span style = 'font-size:20pt; font-family:Niconne;'>3000</span>",
+      "<span style = 'font-size:20pt; font-family:Niconne;'>3500</span>",
+      "<span style = 'font-size:20pt; font-family:Niconne;'>4000</span>"
+    ),
+    position = "right"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    legend.position = "none",
+    axis.line = element_blank(),
+    plot.background = element_blank(),
+    panel.background = element_blank()
+  ) +
+  labs(
+    y = "<span style = 'font-size:32pt; font-family:Niconne;'>Number of spoken lines</span>"
+  ) +
+  theme(
+    axis.text.x = element_markdown(),
+    axis.text.y.right = element_markdown(),
+    axis.ticks.x = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.title.x = element_blank(),
+    axis.title.y.right = element_markdown()
+  )
+
+dist_plot
+```
+
+
+```{r}
+pfinal <- base_plot + inset_element(dist_plot, left = 0.55, bottom = 0, right = 1, top = 0.85)
+
+ggsave(
+  here::here("..", "plots", "2022_03.png"),
+  plot = pfinal,
+  width = 5.5, height = 4,
+  dpi = "retina"
+  )
+```
+
