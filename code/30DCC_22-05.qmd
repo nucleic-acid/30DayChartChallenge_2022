@@ -1,0 +1,127 @@
+---
+title: "30DCC_22_05"
+format: html
+---
+
+## load libraries
+
+
+```{r}
+#| echo: false
+
+library(tidyverse)
+library(ggtext)
+library(ggrepel)
+library(showtext)
+library(ggdist)
+library(patchwork)
+```
+
+## read and wrangle data
+```{r}
+# read data from csv file
+iusers <- read_csv(here::here("..", "data", "owid", "internet_cleaned.csv"))
+
+# only keep countries where there is data for both years of interest (2013 and 2019)
+iusers13_19 <- iusers |> 
+  filter(year %in% c(2013, 2019)) |> 
+  pivot_wider(id_cols = c(entity, code), names_from = year, values_from = individuals_using_the_internet_percent_of_population, names_prefix = "year") |> 
+  drop_na() |> 
+  pivot_longer(cols = c(year2013, year2019), names_prefix = "year", names_to = "year", values_to = "fraction") |> 
+  mutate(
+    is_germany = code == "DEU",
+    point_size = ifelse(is_germany, 3, 0),
+    point_label = ifelse(is_germany, as.character(round(fraction, 1)), ""),
+    line_alpha = ifelse(is_germany, 1, 0.1),
+    is_germany = factor(is_germany, levels = c("TRUE", "FALSE")),
+    year = as.numeric(year)
+  )
+
+iusers13_19 |> 
+  group_by(year) |> 
+  summarise(
+    med = median(fraction),
+    q25 = quantile(fraction, probs = 0.25),
+    q75 = quantile(fraction, probs = 0.75)
+  )
+
+interval_data <- tribble(
+  ~x, ~ymed, ~yq25, ~yq75,
+  2012, 64.5, 46.6, 77.9,
+  2020, 81.9, 69.9, 89.6
+)
+```
+
+```{r}
+font <- c("StarNext")
+path <- system.file(paste0("fonts/", font, ".ttf"), package = "trekfont")
+font_add(font, path)
+font_add_google("Open Sans")
+showtext_auto()
+```
+
+
+# plot
+
+```{r}
+iplot <- ggplot(iusers13_19) +
+  aes(x = year, y = fraction, color = is_germany, group = code) +
+  geom_point(
+    aes(
+      size = point_size
+    )
+  ) +
+  geom_line(
+    aes(alpha = line_alpha)
+  ) +
+  geom_richtext(
+    aes(label = point_label),
+    fill = NA,
+    label.color = NA,
+    nudge_x = -0.7,
+    nudge_y = 2.5,
+    size = 12
+  ) +
+  scale_size(range = c(0, 3)) +
+  scale_color_manual(values = c("#0000FF", "#000000")) +
+  scale_x_continuous(
+    limits = c(2011, 2026),
+    breaks = c(2013, 2019),
+    labels = as.character(c(2013, 2019))) +
+  labs(
+    title = "#Neuland",
+    subtitle = "Private internet usage in <span style='color: #0000FF;'><b>Germany</b></span> increased by 3.9% between 2013 and 2019.<br>While starting at a high level, the increase seems mediocre, when consiering the vast variety<br>of devices and servies available. Other countries made substantial improvements<br>in this period. Counted were individuals, who used the Internet in the previous 3 months <br>by any means (PC, mobile, TV, gaming,...).",
+    y = "Fraction of population using the internet [%]",
+    caption = "<span>DataViz by @c_gebhard | <b>#30DayChartChallenge, Day 5</b><br>Data: OurWorldInData.org/technology-adoption/, WorldBank.org"
+  ) +
+  annotate(
+    geom = "richtext",
+    label = "<span style='font-family: StarNext; font-size: 24pt;'>Background</span><br><span style='font-family: Open Sans; font-size: 24pt;'>In 2013 the former German Chancellor<br>described the internet as 'Neuland', which<br>means 'unknown territory' or <i>'terra<br>incognita'</i> in German. Yes, <i>in 2013</i>.<br>Some see this related to decades of slow<br>adoption/implementation of digital technology<br>in everyday state / civil processes.<br>Back then, the media uproar gathered<br>under the hashtag <b>#neuland</b></span>",
+    fill = NA,
+    label.color = NA,
+    x = 2020,
+    y = 49,
+    hjust = 0,
+    vjust = 0,
+    lineheight = 0.6
+  ) +
+  theme_classic() +
+  theme(
+    legend.position = "none",
+    text = element_text(family = "Open Sans"),
+    axis.line = element_blank(),
+    axis.title.x = element_markdown(family = "Open Sans", size = 20),
+    axis.title.y = element_markdown(family = "Open Sans", size = 20),
+    axis.text = element_markdown(size = 20),
+    panel.grid.major.y = element_line(color = "black", size = 0.1),
+    plot.title.position = "plot",
+    plot.title = element_markdown(size = 64, family = "StarNext"),
+    plot.caption = element_markdown(size = 16, family = "Open Sans", lineheight = 0.4),
+    plot.caption.position = "plot",
+    plot.subtitle = element_markdown(size = 30, family = "Open Sans", lineheight = 0.4)
+  )
+
+ggsave(here::here("..", "plots", "2022_05.png"), plot = iplot, height = 5.5, width = 5.5, dpi = "retina")
+
+```
+
