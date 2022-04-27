@@ -1,0 +1,130 @@
+---
+title: "30DCC_22-12.Rmd"
+author: "Christian Gebhard"
+date: "28 3 2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggtext)
+library(patchwork)
+library(ggdist)
+library(ggrepel)
+
+library(showtext)
+font_add_google("Genos")
+showtext_auto()
+```
+
+
+```{r}
+literacy <- read_csv("../data/owid/literacy-rates-of-the-the-younger-population-15-24-years-versus-literacy-rates-of-the-older-population-65.csv") |> 
+  janitor::clean_names() |> 
+  rename(elderly = elderly_literacy_rate_population_65_years_both_sexes_percent,
+         youth = youth_literacy_rate_population_15_24_years_both_sexes_percent) |> 
+  filter(!is.na(code))
+
+latest <- literacy |> 
+  drop_na(elderly, youth) |> 
+  group_by(code) |> 
+  filter(year == max(year)) |> 
+  ungroup() |> 
+  filter(year >= 2000) |> 
+  pivot_longer(c(elderly, youth), names_to = "generation", values_to = "literacy_pct") |> 
+  mutate(
+    weight = (year - 2000) + 0.001,
+    label = ifelse(year == 2016, entity, ""),
+    label = ifelse((generation == "youth" & literacy_pct < 90) | generation == "elderly", label, "")
+  )
+
+# summary(latest)
+
+```
+
+```{r}
+
+future <- ggplot(latest, aes(x = generation, y = literacy_pct, weight = weight, color = generation, fill = generation)) +
+  ggdist::stat_halfeye(
+    adjust = .5,
+    width = .6,
+    .width = 0,
+    position = position_nudge(x = .25),
+    point_colour = NA,
+    alpha = 0.85,
+    ) +
+  ggdist::stat_pointinterval(
+    color = "black",
+    position = position_nudge(x = .25)) +
+  geom_point(
+    aes(
+      size = exp(weight),
+      alpha = exp(weight),
+      ),
+    position = position_jitter(
+      seed = 123, width = .2
+    ),
+  ) +
+  geom_text_repel(
+    aes(label = label),
+    max.iter = 100000,
+    max.overlaps = 50,
+    position = position_jitter(
+      seed = 123, width = .2
+    ),
+    size = 4,
+    xlim = c(-Inf, Inf), ylim = c(-Inf, Inf)
+  ) +
+  scale_alpha_continuous(range = c(0.1, 0.5)) +
+  scale_size_continuous(range = c(1, 3)) +
+  scale_x_discrete(labels = c("aged<br><b>65+</b><br>", "aged<br><b>15-24</b><br>years"), position = "top") +
+  scale_y_continuous(
+    expand = expansion(mult = c(0.2, 0.1)),
+    breaks = c(0, 20, 40, 60, 80, 100),
+    labels = as.character(c(0, 20, 40, 60, 80, 100))
+  ) +
+  labs(
+    title = "<b>Global literacy will most likely continue to improve in the future</b>",
+    subtitle = "Literacy has improved globally across the last two centuries. The <b>future</b> is even more promising, as in most countries<br> people aged 15-24 years have a high literacy proportion. However, the data is not assessed at the same timepoint<br>in all countries. The 'latest assessment' might lie >20 years back. This raincloud plot tries to tackle the uncertainty<br>within the distribution by visually emphasising the more recent measurements. Data depicted ranges from 2000 to 2016.",
+    y = "<b>literate fraction of the population in %</b>",
+    caption = "<span>DataViz by @c_gebhard | <b>#30DayChartChallenge, Day 27</b></span><br><span><br>Data: OWID, UNESCO and others, see ourworldindata.org/literacy</span>"
+  ) +
+  coord_flip() +
+  theme_classic() +
+  theme(
+    plot.title.position = "plot",
+    plot.title = element_markdown(family = "Genos", size = 40),
+    plot.subtitle = element_markdown(family = "Genos", size = 24, lineheight = 0.3),
+    legend.position = "none",
+    axis.title.y = element_blank(),
+    axis.text.y.right = element_markdown(family = "Genos", size = 24, lineheight = 0.3),
+    axis.ticks.y = element_blank(),
+    axis.title.x = element_markdown(family = "Genos", size = 24),
+    axis.text.x = element_markdown(family = "Genos", size = 20),
+    axis.ticks.x = element_blank(),
+    axis.line = element_blank(),
+    panel.grid.major.x = element_line(color = "#000000", size = 0.2, linetype = "dotted"),
+    plot.caption.position = "plot",
+    plot.caption = element_markdown(family = "Genos", size = 18, lineheight = 0.1)
+  )
+
+
+howto <- ggplot() +
+  labs(
+    title = "<b>How to read:</b>",
+    subtitle = "<br>This can be read like a raincloud plot.<br>However, <b>the size of the rain drops<br>determines the recency of the literacy<br>assessment:</b> The largest/dense circles were <br>assessed in 2016. The smaller & more<br>transparent the dots are, the more do they<br>date back until the year 2000."
+  ) +
+  theme_bw() +
+  theme(
+    plot.title = element_markdown(family = "Genos", size = 20, lineheight = 0.3),
+    plot.subtitle = element_markdown(family = "Genos", size = 16, lineheight = 0.3)
+  )
+
+patched <- future + inset_element(howto, left = 0, right = 0.25, top = 0.85, bottom = 0.7)
+
+ggsave(here::here("..", "plots", "2022_27.png"), plot = patched, height = 4, width = 5.5, dpi = "retina")
+
+
+```
+
