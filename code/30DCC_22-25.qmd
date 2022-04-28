@@ -1,0 +1,144 @@
+---
+title: "30DCC_22-25"
+format: html
+---
+
+## load libraries
+
+```{r}
+library(tidyverse)
+```
+
+## load data
+```{r}
+jan <- read_csv("../data/munich/rad_2022_01_15min.csv")
+
+march <- read_csv("../data/munich/rad_2022_03_15min.csv") 
+
+```
+
+
+## read data
+
+```{r}
+q1 <- rbind(jan, march) |> 
+  mutate(
+    datum = lubridate::ymd(datum),
+    bikedt_chr = paste(datum, uhrzeit_start),
+    bikedt_dt = lubridate::ymd_hms(bikedt_chr),
+    bikehour = lubridate::hour(bikedt_dt),
+    daytime = format(as.POSIXct(uhrzeit_start), format = "%H:%M"),
+    monat = lubridate::month(bikedt_dt, label = TRUE, abbr = FALSE, locale = "en_US.UTF-8"),
+    count_trans = sqrt(gesamt),
+    strong_day = ifelse(gesamt >= 50, TRUE, FALSE)
+  )
+
+```
+
+
+```{r}
+
+hvalues2 <- c("00:00", "02:00", "04:00", "06:00", "08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00", "22:00")
+hvalues2_labels <- c("00:00", "02", "04", "06:00", "08", "10", "12:00", "14", "16", "18:00", "20", "22")
+
+library(ggpubr)
+library(png)
+library(ggimage)
+library(MetBrewer)
+library(geomtextpath)
+library(ggtext)
+library(showtext)
+font_add_google("Sora")
+font_add_google("Atkinson Hyperlegible")
+showtext_auto()
+
+rider <- readPNG("assets/rider.png", native = TRUE)
+
+p <- ggplot(q1) +
+  aes(
+    x = daytime,
+    y = gesamt,
+    color = strong_day
+  ) +
+  geom_point(
+    alpha = 0.7,
+    size = 4,
+    position = position_jitter(),
+    shape = "."
+  ) +
+  geom_texthline(yintercept = 0, label = "<span style='font-size: 16pt;'><b>0 bikes</b></span>", vjust = 1.1, hjust = 0.1, rich = TRUE) +
+  geom_texthline(yintercept = 50, label = "<span style='font-size: 16pt;'><b>50 bikes in 15 minutes</b></span>", vjust = -0.1, hjust = 0, rich = TRUE) +
+  scale_y_continuous(
+    limits = c(-200, 180),
+    breaks = c(-10, 50, 100)
+    ) +
+  scale_x_discrete(breaks = hvalues2, labels = hvalues2_labels) +
+  scale_color_manual(values = c("#666666", "#ffb300")) +
+  coord_curvedpolar(clip = "off") +
+  facet_wrap(~ monat, strip.position = "bottom") +
+  theme_minimal() +
+  theme(
+    text = element_text(family = "Atkinson Hyperlegible", lineheight = 0.4),
+    panel.grid.major.y = element_blank(), #element_line(color = "#EEEEEE"),
+    axis.text.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.title = element_blank(),
+    axis.text = element_markdown(family = "Atkinson Hyperlegible", size = 14, face = "bold"),
+    legend.position = "none",
+    strip.text = element_markdown(family = "Atkinson Hyperlegible", size = 24, face = "bold")
+  )
+  
+library(patchwork)
+
+# a background plot is created with the title, subtitle and caption
+back_plot <- ggplot() +
+  labs(
+    title = "<b>Spring makes citizens of Munich use their bikes more</b>",
+    subtitle = "There are 6 spots across the city of Munich, where passing bikes are counted around the clock.<br>From January to March 2022 there is a considerable inrease in cyclists. Each dot below is a 15 minute slot<br>at any of the counting locations on one of the months' days. In March <span style='color: #ffb300';><b> >50 cyclists in 15 minutes</b></span><br>were registered on many more occasions than in January.",
+    caption = "<span>DataViz by @c_gebhard | <b>#30DayChartChallenge Day 25</b><br>Data source: dl-de/by-2-0: Landeshauptstadt München |  <i>opengov-muenchen.de</i></span>"
+  ) +
+  scale_x_continuous(
+    limits = c(0,100)
+  ) +
+  scale_y_continuous(
+    limits = c(0,100)
+  ) +
+  theme_minimal() +
+  theme(
+    text = element_text(family = "Sora", lineheight = 0.4),
+    plot.title = element_markdown(family = "Sora", size = 48),
+    plot.subtitle = element_markdown(family = "Sora", size = 24, lineheight = 0.4),
+    plot.caption = element_markdown(family = "Sora", size = 20),
+    panel.grid = element_blank(),
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank()
+  ) 
+
+
+patched <- back_plot + 
+  inset_element(
+    p,
+    left = 0,
+    right = 1,
+    bottom = 0.01,
+    top = 0.8,
+    align_to = "full"
+  ) +
+  inset_element(
+    rider, 
+    left = 0.28,
+    right = 0.78,
+    bottom = 0.2,
+    top = 1,
+    clip = FALSE,
+    align_to = "full",
+    on_top = FALSE
+  )
+
+#ggsave stores the final plot to file
+ggsave(here::here("..", "plots", "2022_25.png"), plot = patched, height = 5, width = 6, dpi = "retina")
+
+  
+```
+
